@@ -35,11 +35,12 @@ interface PracticePageProps {
   isDemoMode: boolean;
   onComplete: (session: PracticeSession) => void;
   onExit: () => void;
+  onViewGuide?: () => void;
 }
 
 type PracticePhase = "intro" | "listening" | "rep-complete" | "done";
 
-export function PracticePage({ child, target, isDemoMode, onComplete, onExit }: PracticePageProps) {
+export function PracticePage({ child, target, isDemoMode, onComplete, onExit, onViewGuide }: PracticePageProps) {
   const isVisual = target.feedbackMode !== "audio_only";
   const useWebcam = isVisual && !isDemoMode;
   const useDemoCV = isVisual && isDemoMode;
@@ -261,7 +262,17 @@ export function PracticePage({ child, target, isDemoMode, onComplete, onExit }: 
             <span className="bg-slate-800 text-white text-xs font-bold rounded-full px-2 py-0.5">DEMO</span>
           )}
         </div>
-        <div className="w-12" />
+        {onViewGuide ? (
+          <button
+            onClick={onViewGuide}
+            className="text-xs font-bold text-orange-500 bg-orange-50 hover:bg-orange-100 rounded-full px-2.5 py-1 transition-colors"
+            title="View articulation guide"
+          >
+            👁 Guide
+          </button>
+        ) : (
+          <div className="w-12" />
+        )}
       </div>
 
       <div className="flex-1 flex flex-col items-center px-4 gap-3 pb-6">

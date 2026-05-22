@@ -8,6 +8,7 @@ export type AppPage =
   | "landing"
   | "child-setup"
   | "target-select"
+  | "see-the-sound"
   | "practice"
   | "session-complete"
   | "parent-dashboard"

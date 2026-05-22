@@ -6,6 +6,7 @@ import { PracticePage } from "./pages/PracticePage";
 import { SessionCompletePage } from "./pages/SessionCompletePage";
 import { ParentDashboardPage } from "./pages/ParentDashboardPage";
 import { ClinicianSummaryPage } from "./pages/ClinicianSummaryPage";
+import { SeeTheSoundPage } from "./pages/SeeTheSoundPage";
 import { useSessions } from "./hooks/useSessions";
 import { saveSessions } from "./lib/storage";
 import type { AppPage, ChildProfile, PracticeSession, SpeechTarget } from "./types";
@@ -76,7 +77,7 @@ export function App() {
 
   const handleSelectTarget = useCallback((target: SpeechTarget) => {
     setSelectedTarget(target);
-    setPage("practice");
+    setPage("see-the-sound");
   }, []);
 
   const handleSessionComplete = useCallback(
@@ -128,6 +129,14 @@ export function App() {
         />
       )}
 
+      {page === "see-the-sound" && selectedTarget && (
+        <SeeTheSoundPage
+          target={selectedTarget}
+          onStartPractice={() => setPage("practice")}
+          onBack={() => setPage("target-select")}
+        />
+      )}
+
       {page === "practice" && child && selectedTarget && (
         <PracticePage
           key={selectedTarget.id + String(isDemoMode)}
@@ -136,6 +145,7 @@ export function App() {
           isDemoMode={isDemoMode}
           onComplete={handleSessionComplete}
           onExit={() => setPage("target-select")}
+          onViewGuide={() => setPage("see-the-sound")}
         />
       )}
 
