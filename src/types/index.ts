@@ -7,7 +7,8 @@ export type DifficultyRating = "easy" | "okay" | "hard";
 export type AppPage =
   | "landing"
   | "child-setup"
-  | "target-select"
+  | "map"
+  | "module-intro"
   | "see-the-sound"
   | "practice"
   | "session-complete"
@@ -19,6 +20,7 @@ export interface ChildProfile {
   nickname: string;
   ageRange: AgeRange;
   createdAt: string;
+  hasCompletedSetup?: boolean;
 }
 
 export interface SpeechTarget {
@@ -36,12 +38,28 @@ export interface SpeechTarget {
   parentCue?: string;
   color: string;
   emoji: string;
+  placementGuideType?: string;
+}
+
+export interface MapModule {
+  id: string;
+  title: string;
+  subtitle: string;
+  targetId: string;
+  words: string[];
+  unlocked: boolean;
+  emoji: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  comingSoon?: boolean;
 }
 
 export interface PracticeAttempt {
   id: string;
   attemptNumber: number;
   targetLabel: string;
+  targetWord: string;
   audioAttemptDetected: boolean;
   visualScore?: number;
   holdDurationMs?: number;
@@ -54,12 +72,14 @@ export interface PracticeAttempt {
 export interface PracticeSession {
   id: string;
   childId: string;
+  moduleId: string;
   targetId: string;
   targetLabel: string;
   targetIpa: string;
   startedAt: string;
   completedAt?: string;
   attempts: PracticeAttempt[];
+  wordsAttempted: string[];
   rewardsEarned: number;
   plantStage: PlantStage;
   parentDifficultyRating?: DifficultyRating;

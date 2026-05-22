@@ -33,6 +33,16 @@ export function generateClinicianSummary(
   const lastDate = new Date(targetSessions[targetSessions.length - 1].startedAt).toLocaleDateString();
   const dateRange = firstDate === lastDate ? firstDate : `${firstDate} – ${lastDate}`;
 
+  const allWords = [
+    ...new Set(
+      targetSessions.flatMap((s) =>
+        s.wordsAttempted?.length
+          ? s.wordsAttempted
+          : s.attempts.map((a) => (a as { targetWord?: string }).targetWord).filter(Boolean) as string[]
+      )
+    ),
+  ];
+
   const feedbackLabel: Record<string, string> = {
     audio_only: "Audio only (low-visibility target)",
     audio_plus_visual: "Audio + visual movement support",
@@ -76,6 +86,7 @@ export function generateClinicianSummary(
     `Sessions completed: ${targetSessions.length}`,
     `Total attempts: ${totalAttempts}`,
     `Completion rate: ${completionRate}%`,
+    allWords.length > 0 ? `Words practised: ${allWords.join(", ")}` : "",
     holdNote,
     ``,
     `Observation: ${observation}`,

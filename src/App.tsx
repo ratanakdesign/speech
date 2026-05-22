@@ -1,49 +1,22 @@
 import { useCallback, useState } from "react";
 import { WelcomePage } from "./pages/WelcomePage";
 import { ChildSetupPage } from "./pages/ChildSetupPage";
-import { TargetSelectionPage } from "./pages/TargetSelectionPage";
+import { LearningMapPage } from "./pages/LearningMapPage";
+import { ModuleIntroPage } from "./pages/ModuleIntroPage";
 import { PracticePage } from "./pages/PracticePage";
 import { SessionCompletePage } from "./pages/SessionCompletePage";
 import { ParentDashboardPage } from "./pages/ParentDashboardPage";
 import { ClinicianSummaryPage } from "./pages/ClinicianSummaryPage";
 import { SeeTheSoundPage } from "./pages/SeeTheSoundPage";
 import { useSessions } from "./hooks/useSessions";
-import { saveSessions } from "./lib/storage";
-import type { AppPage, ChildProfile, PracticeSession, SpeechTarget } from "./types";
-
-// Demo seed data for the demo mode flow
-function makeDemoSession(target: SpeechTarget, child: ChildProfile): PracticeSession {
-  const now = Date.now();
-  return {
-    id: "demo-session-1",
-    childId: child.id,
-    targetId: target.id,
-    targetLabel: target.label,
-    targetIpa: target.ipa,
-    startedAt: new Date(now - 420000).toISOString(),
-    completedAt: new Date(now - 120000).toISOString(),
-    attempts: Array.from({ length: 5 }, (_, i) => ({
-      id: `demo-attempt-${i}`,
-      attemptNumber: i + 1,
-      targetLabel: target.label,
-      audioAttemptDetected: true,
-      visualScore: target.feedbackMode !== "audio_only" ? 52 + i * 8 : undefined,
-      holdDurationMs: target.feedbackMode !== "audio_only" ? 1800 + i * 400 : undefined,
-      stabilityScore: target.feedbackMode !== "audio_only" ? 65 + i * 5 : undefined,
-      symmetryScore: target.feedbackMode !== "audio_only" ? 80 + i * 2 : undefined,
-      completed: true,
-      feedback: "Nice effort! Your plant is growing!",
-    })),
-    rewardsEarned: 5,
-    plantStage: 4,
-    parentDifficultyRating: "okay",
-    parentNote: "Practice was easier when done after dinner.",
-  };
-}
+import { loadChild, saveSessions } from "./lib/storage";
+import { getTargetById } from "./data/speechTargets";
+import type { AppPage, ChildProfile, MapModule, PracticeSession, SpeechTarget } from "./types";
 
 export function App() {
-  const [page, setPage] = useState<AppPage>("landing");
+  const [page, setPage] = useState<AppPage>(() => (loadChild() ? "map" : "landing"));
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [selectedModule, setSelectedModule] = useState<MapModule | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<SpeechTarget | null>(null);
   const [currentSession, setCurrentSession] = useState<PracticeSession | null>(null);
 
@@ -52,7 +25,7 @@ export function App() {
   const handleStart = useCallback(() => {
     setIsDemoMode(false);
     if (child) {
-      setPage("target-select");
+      setPage("map");
     } else {
       setPage("child-setup");
     }
@@ -61,7 +34,7 @@ export function App() {
   const handleDemo = useCallback(() => {
     setIsDemoMode(true);
     if (child) {
-      setPage("target-select");
+      setPage("map");
     } else {
       setPage("child-setup");
     }
@@ -69,15 +42,18 @@ export function App() {
 
   const handleChildSetup = useCallback(
     (profile: ChildProfile) => {
-      saveChildProfile(profile);
-      setPage("target-select");
+      saveChildProfile({ ...profile, hasCompletedSetup: true });
+      setPage("map");
     },
     [saveChildProfile]
   );
 
-  const handleSelectTarget = useCallback((target: SpeechTarget) => {
+  const handleSelectModule = useCallback((m: MapModule) => {
+    const target = getTargetById(m.targetId);
+    if (!target) return;
+    setSelectedModule(m);
     setSelectedTarget(target);
-    setPage("see-the-sound");
+    setPage("module-intro");
   }, []);
 
   const handleSessionComplete = useCallback(
@@ -91,22 +67,12 @@ export function App() {
 
   const handleUpdateSession = useCallback(
     (updated: PracticeSession) => {
-      // Update in storage by replacing the last session
-      // The session is already saved; we just update parent data
       const newSessions = sessions.map((s) => (s.id === updated.id ? updated : s));
       saveSessions(newSessions);
       setCurrentSession(updated);
     },
     [sessions]
   );
-
-  const handleDemoFlow = useCallback(() => {
-    if (!selectedTarget || !child) return;
-    const demo = makeDemoSession(selectedTarget, child);
-    addSession(demo);
-    setCurrentSession(demo);
-    setPage("session-complete");
-  }, [selectedTarget, child, addSession]);
 
   return (
     <>
@@ -121,11 +87,23 @@ export function App() {
         />
       )}
 
-      {page === "target-select" && child && (
-        <TargetSelectionPage
+      {page === "map" && child && (
+        <LearningMapPage
           child={child}
-          onSelect={handleSelectTarget}
-          onBack={() => setPage(child ? "landing" : "child-setup")}
+          sessions={sessions}
+          onSelectModule={handleSelectModule}
+          onParentView={() => setPage("parent-dashboard")}
+        />
+      )}
+
+      {page === "module-intro" && selectedModule && selectedTarget && child && (
+        <ModuleIntroPage
+          module={selectedModule}
+          target={selectedTarget}
+          child={child}
+          onStartPractice={() => setPage("practice")}
+          onSeeTheSound={() => setPage("see-the-sound")}
+          onBack={() => setPage("map")}
         />
       )}
 
@@ -133,18 +111,19 @@ export function App() {
         <SeeTheSoundPage
           target={selectedTarget}
           onStartPractice={() => setPage("practice")}
-          onBack={() => setPage("target-select")}
+          onBack={() => setPage("module-intro")}
         />
       )}
 
-      {page === "practice" && child && selectedTarget && (
+      {page === "practice" && child && selectedTarget && selectedModule && (
         <PracticePage
-          key={selectedTarget.id + String(isDemoMode)}
+          key={selectedModule.id + String(isDemoMode)}
           child={child}
+          module={selectedModule}
           target={selectedTarget}
           isDemoMode={isDemoMode}
           onComplete={handleSessionComplete}
-          onExit={() => setPage("target-select")}
+          onExit={() => setPage("map")}
           onViewGuide={() => setPage("see-the-sound")}
         />
       )}
@@ -154,7 +133,7 @@ export function App() {
           session={currentSession}
           onUpdateSession={handleUpdateSession}
           onViewDashboard={() => setPage("parent-dashboard")}
-          onPracticeAgain={() => setPage("target-select")}
+          onPracticeAgain={() => setPage("map")}
         />
       )}
 
@@ -163,7 +142,7 @@ export function App() {
           child={child}
           sessions={sessions}
           onClinicianSummary={() => setPage("clinician-summary")}
-          onPractice={() => setPage("target-select")}
+          onPractice={() => setPage("map")}
           onBack={() => setPage("landing")}
           onClearData={clearData}
         />
