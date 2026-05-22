@@ -2,7 +2,6 @@ import { useCallback, useState } from "react";
 import { WelcomePage } from "./pages/WelcomePage";
 import { ChildSetupPage } from "./pages/ChildSetupPage";
 import { LearningMapPage } from "./pages/LearningMapPage";
-import { ModuleIntroPage } from "./pages/ModuleIntroPage";
 import { PracticePage } from "./pages/PracticePage";
 import { SessionCompletePage } from "./pages/SessionCompletePage";
 import { ParentDashboardPage } from "./pages/ParentDashboardPage";
@@ -24,20 +23,12 @@ export function App() {
 
   const handleStart = useCallback(() => {
     setIsDemoMode(false);
-    if (child) {
-      setPage("map");
-    } else {
-      setPage("child-setup");
-    }
+    setPage(child ? "map" : "child-setup");
   }, [child]);
 
   const handleDemo = useCallback(() => {
     setIsDemoMode(true);
-    if (child) {
-      setPage("map");
-    } else {
-      setPage("child-setup");
-    }
+    setPage(child ? "map" : "child-setup");
   }, [child]);
 
   const handleChildSetup = useCallback(
@@ -48,12 +39,13 @@ export function App() {
     [saveChildProfile]
   );
 
+  // Called from LearningMapPage bottom sheet "Let's go!" — goes straight to practice
   const handleSelectModule = useCallback((m: MapModule) => {
     const target = getTargetById(m.targetId);
     if (!target) return;
     setSelectedModule(m);
     setSelectedTarget(target);
-    setPage("module-intro");
+    setPage("practice");
   }, []);
 
   const handleSessionComplete = useCallback(
@@ -75,86 +67,78 @@ export function App() {
   );
 
   return (
-    <>
-      {page === "landing" && (
-        <WelcomePage onStart={handleStart} onDemo={handleDemo} />
-      )}
+    // Mobile-first container: full screen on mobile, centered 430px phone frame on desktop
+    <div className="min-h-screen bg-amber-100/70 flex justify-center">
+      <div className="w-full max-w-[430px] min-h-screen bg-white shadow-2xl shadow-amber-200/50 relative overflow-hidden">
+        {page === "landing" && (
+          <WelcomePage onStart={handleStart} onDemo={handleDemo} />
+        )}
 
-      {page === "child-setup" && (
-        <ChildSetupPage
-          onContinue={handleChildSetup}
-          onBack={() => setPage("landing")}
-        />
-      )}
+        {page === "child-setup" && (
+          <ChildSetupPage
+            onContinue={handleChildSetup}
+            onBack={() => setPage("landing")}
+          />
+        )}
 
-      {page === "map" && child && (
-        <LearningMapPage
-          child={child}
-          sessions={sessions}
-          onSelectModule={handleSelectModule}
-          onParentView={() => setPage("parent-dashboard")}
-        />
-      )}
+        {page === "map" && child && (
+          <LearningMapPage
+            child={child}
+            sessions={sessions}
+            onSelectModule={handleSelectModule}
+            onParentView={() => setPage("parent-dashboard")}
+          />
+        )}
 
-      {page === "module-intro" && selectedModule && selectedTarget && child && (
-        <ModuleIntroPage
-          module={selectedModule}
-          target={selectedTarget}
-          child={child}
-          onStartPractice={() => setPage("practice")}
-          onSeeTheSound={() => setPage("see-the-sound")}
-          onBack={() => setPage("map")}
-        />
-      )}
+        {page === "see-the-sound" && selectedTarget && (
+          <SeeTheSoundPage
+            target={selectedTarget}
+            onStartPractice={() => setPage("practice")}
+            onBack={() => setPage(selectedModule ? "practice" : "map")}
+          />
+        )}
 
-      {page === "see-the-sound" && selectedTarget && (
-        <SeeTheSoundPage
-          target={selectedTarget}
-          onStartPractice={() => setPage("practice")}
-          onBack={() => setPage("module-intro")}
-        />
-      )}
+        {page === "practice" && child && selectedTarget && selectedModule && (
+          <PracticePage
+            key={selectedModule.id + String(isDemoMode)}
+            child={child}
+            module={selectedModule}
+            target={selectedTarget}
+            isDemoMode={isDemoMode}
+            onComplete={handleSessionComplete}
+            onExit={() => setPage("map")}
+            onViewGuide={() => setPage("see-the-sound")}
+          />
+        )}
 
-      {page === "practice" && child && selectedTarget && selectedModule && (
-        <PracticePage
-          key={selectedModule.id + String(isDemoMode)}
-          child={child}
-          module={selectedModule}
-          target={selectedTarget}
-          isDemoMode={isDemoMode}
-          onComplete={handleSessionComplete}
-          onExit={() => setPage("map")}
-          onViewGuide={() => setPage("see-the-sound")}
-        />
-      )}
+        {page === "session-complete" && currentSession && (
+          <SessionCompletePage
+            session={currentSession}
+            onUpdateSession={handleUpdateSession}
+            onViewDashboard={() => setPage("parent-dashboard")}
+            onPracticeAgain={() => setPage("map")}
+          />
+        )}
 
-      {page === "session-complete" && currentSession && (
-        <SessionCompletePage
-          session={currentSession}
-          onUpdateSession={handleUpdateSession}
-          onViewDashboard={() => setPage("parent-dashboard")}
-          onPracticeAgain={() => setPage("map")}
-        />
-      )}
+        {page === "parent-dashboard" && child && (
+          <ParentDashboardPage
+            child={child}
+            sessions={sessions}
+            onClinicianSummary={() => setPage("clinician-summary")}
+            onPractice={() => setPage("map")}
+            onBack={() => setPage(sessions.length > 0 ? "map" : "landing")}
+            onClearData={clearData}
+          />
+        )}
 
-      {page === "parent-dashboard" && child && (
-        <ParentDashboardPage
-          child={child}
-          sessions={sessions}
-          onClinicianSummary={() => setPage("clinician-summary")}
-          onPractice={() => setPage("map")}
-          onBack={() => setPage("landing")}
-          onClearData={clearData}
-        />
-      )}
-
-      {page === "clinician-summary" && child && (
-        <ClinicianSummaryPage
-          child={child}
-          sessions={sessions}
-          onBack={() => setPage("parent-dashboard")}
-        />
-      )}
-    </>
+        {page === "clinician-summary" && child && (
+          <ClinicianSummaryPage
+            child={child}
+            sessions={sessions}
+            onBack={() => setPage("parent-dashboard")}
+          />
+        )}
+      </div>
+    </div>
   );
 }
