@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { PlantIllustration } from "../components/PlantIllustration";
 import { WaterDrops } from "../components/WaterDrops";
 import { ScoreRing } from "../components/ScoreRing";
@@ -18,7 +19,6 @@ import type {
 } from "../types";
 
 const TOTAL_ATTEMPTS = 5;
-
 const AUDIO_FEEDBACK = [
   "Great effort! 🎉",
   "Nice try! Keep it up! 🌟",
@@ -61,7 +61,7 @@ export function PracticePage({
   const [plantStage, setPlantStage] = useState<PlantStage>(0);
   const [repFlash, setRepFlash] = useState(false);
 
-  // Stable refs for use inside RAF + setTimeout callbacks
+  // Refs for stable values inside RAF + setTimeout callbacks
   const phaseRef = useRef<PracticePhase>("intro");
   const attemptNumRef = useRef(1);
   const attemptsRef = useRef<PracticeAttempt[]>([]);
@@ -79,13 +79,14 @@ export function PracticePage({
   currentWordRef.current = module.words[(attemptNum - 1) % module.words.length];
 
   const currentWord = currentWordRef.current;
+  const completedCount = attempts.filter((a) => a.completed).length;
 
-  // Webcam (real) and visual simulation (demo)
+  // Webcam + visual simulation
   const { videoRef, canvasRef, metrics, status: camStatus, permissionDenied } =
     useFaceLandmarks(useWebcam && phase === "listening");
   const { demoState } = useDemoMode(useDemoCV && phase === "listening");
 
-  // Audio analysis — only for audio-only targets; handles both real mic and demo simulation
+  // Audio analysis — audio-only targets (real + demo simulation)
   const { audioState, resetAttempt } = useAudioAnalysis(
     !isVisual && phase === "listening",
     isDemoMode
@@ -164,10 +165,13 @@ export function PracticePage({
       setFeedbackMsg("Nice hold! You watered your plant! 💧");
       setHoldProgress(0);
       holdStartRef.current = null;
-      const np = Math.min(4, Math.floor((newAttempts.filter((a) => a.completed).length / TOTAL_ATTEMPTS) * 5)) as PlantStage;
+      const np = Math.min(
+        4,
+        Math.floor((newAttempts.filter((a) => a.completed).length / TOTAL_ATTEMPTS) * 5)
+      ) as PlantStage;
       setPlantStage(np);
-      setTimeout(() => setRepFlash(false), 800);
-      setTimeout(() => advanceAttempt(newAttempts), 1800);
+      setTimeout(() => setRepFlash(false), 900);
+      setTimeout(() => advanceAttempt(newAttempts), 1900);
     },
     [target, advanceAttempt]
   );
@@ -195,10 +199,13 @@ export function PracticePage({
     phaseRef.current = "rep-complete";
     setRepFlash(true);
     setFeedbackMsg(fb);
-    const np = Math.min(4, Math.floor((newAttempts.filter((a) => a.completed).length / TOTAL_ATTEMPTS) * 5)) as PlantStage;
+    const np = Math.min(
+      4,
+      Math.floor((newAttempts.filter((a) => a.completed).length / TOTAL_ATTEMPTS) * 5)
+    ) as PlantStage;
     setPlantStage(np);
-    setTimeout(() => setRepFlash(false), 800);
-    setTimeout(() => advanceAttempt(newAttempts), 1600);
+    setTimeout(() => setRepFlash(false), 900);
+    setTimeout(() => advanceAttempt(newAttempts), 1700);
   }, [target, advanceAttempt]);
 
   // RAF loop for visual scoring
@@ -207,9 +214,11 @@ export function PracticePage({
 
     function tick() {
       if (phaseRef.current !== "listening" || repCompleteRef.current) return;
-
       const activeMetrics = useDemoCV ? demoState.metrics : metrics;
-      recentRoundnessRef.current = [...recentRoundnessRef.current.slice(-8), activeMetrics.roundnessRatio];
+      recentRoundnessRef.current = [
+        ...recentRoundnessRef.current.slice(-8),
+        activeMetrics.roundnessRatio,
+      ];
       const result = computeLipRoundingScore(activeMetrics, recentRoundnessRef.current);
 
       setScore(result.total);
@@ -237,7 +246,7 @@ export function PracticePage({
     return () => cancelAnimationFrame(rafRef.current);
   }, [isVisual, phase, metrics, demoState.metrics, useDemoCV, completeRep]);
 
-  // Audio attempt detection (audio-only targets)
+  // Audio attempt detection
   useEffect(() => {
     if (isVisual || phase !== "listening") return;
     if (audioState.isAttemptDetected && !repCompleteRef.current) completeAudioRep();
@@ -259,72 +268,110 @@ export function PracticePage({
     setPhase("listening");
   }
 
-  const completedCount = attempts.filter((a) => a.completed).length;
   const displayScore = useDemoCV ? demoState.simulatedScore : score;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 pt-5 pb-2">
-        <button
+      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <motion.button
           onClick={onExit}
-          className="text-slate-500 font-semibold text-sm hover:text-slate-700 transition-colors"
+          className="text-slate-400 font-semibold text-sm hover:text-slate-600 transition-colors"
+          whileTap={{ scale: 0.94 }}
+          transition={{ type: "spring", stiffness: 500, damping: 35 }}
         >
           ← Exit
-        </button>
+        </motion.button>
         <div className="flex items-center gap-2">
-          <span className="font-black text-orange-600 text-sm">
-            {target.label} {target.ipa}
-          </span>
+          <span className="font-black text-orange-500 text-sm">{target.label} {target.ipa}</span>
           {isDemoMode && (
-            <span className="bg-slate-800 text-white text-xs font-bold rounded-full px-2 py-0.5">
+            <span className="bg-slate-800 text-white text-[10px] font-black rounded-full px-2 py-0.5">
               DEMO
             </span>
           )}
         </div>
         {onViewGuide ? (
-          <button
+          <motion.button
             onClick={onViewGuide}
             className="text-xs font-bold text-orange-500 bg-orange-50 hover:bg-orange-100 rounded-full px-2.5 py-1 transition-colors"
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 500, damping: 35 }}
           >
             👁 Guide
-          </button>
+          </motion.button>
         ) : (
-          <div className="w-12" />
+          <div className="w-14" />
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center px-4 gap-3 pb-6">
-        {/* Plant + progress */}
+      <div className="flex-1 flex flex-col items-center px-5 gap-4 pb-8">
+        {/* Plant + water drops */}
         <div
-          className={`bg-white rounded-3xl shadow-lg shadow-orange-100 border border-orange-100 p-5 w-full max-w-sm flex flex-col items-center gap-2 transition-all duration-300 ${
-            repFlash ? "ring-4 ring-green-400 ring-offset-2" : ""
+          className={`bg-white rounded-3xl border border-orange-100 shadow-lg shadow-orange-100/50 p-5 w-full max-w-sm flex flex-col items-center gap-3 transition-all duration-300 ${
+            repFlash ? "ring-4 ring-green-400 ring-offset-2 shadow-green-200" : ""
           }`}
         >
-          <PlantIllustration stage={plantStage} size={90} animate />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={plantStage}
+              initial={{ scale: 0.55, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.7, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 18 }}
+            >
+              <PlantIllustration stage={plantStage} size={84} />
+            </motion.div>
+          </AnimatePresence>
           <WaterDrops total={TOTAL_ATTEMPTS} filled={completedCount} />
-          <p className="text-xs text-slate-500 font-semibold">
-            {completedCount} / {TOTAL_ATTEMPTS} done
-          </p>
         </div>
 
-        {/* Current word card */}
-        <div className="bg-white rounded-3xl shadow-md shadow-orange-100 p-4 w-full max-w-sm text-center border border-orange-100">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-0.5">
-            Attempt {attemptNum} of {TOTAL_ATTEMPTS}
-          </p>
-          <p className="text-3xl font-black text-slate-800">{currentWord}</p>
-          {isVisual && target.visualCue && phase !== "intro" && (
-            <p className="text-sm text-slate-500 font-medium mt-1">{target.visualCue}</p>
-          )}
-          {!isVisual && phase !== "intro" && (
-            <p className="text-sm text-orange-600 font-semibold mt-1">🎤 Say it out loud!</p>
-          )}
+        {/* Word — primary practice element, no card frame */}
+        <div className="w-full max-w-sm text-center px-2">
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={currentWord}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -14 }}
+              transition={{ duration: 0.17, ease: [0.22, 1, 0.36, 1] }}
+              className="text-5xl font-black text-slate-800 tracking-tight"
+            >
+              {currentWord}
+            </motion.p>
+          </AnimatePresence>
+
+          {/* Contextual cue below word */}
+          <AnimatePresence mode="wait">
+            {isVisual && target.visualCue && phase === "listening" && (
+              <motion.p
+                key="visual-cue"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="text-sm font-semibold text-slate-400 mt-2"
+              >
+                {target.visualCue}
+              </motion.p>
+            )}
+            {!isVisual && phase === "listening" && (
+              <motion.p
+                key="audio-cue"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="text-sm font-bold text-orange-400 mt-2"
+              >
+                say it out loud 🎤
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Webcam / visual area */}
+        {/* Webcam / visual tracking area */}
         {isVisual && (
-          <div className="bg-white rounded-3xl shadow-md shadow-orange-100 p-3 w-full max-w-sm border border-orange-100">
+          <div className="bg-white rounded-3xl shadow-md shadow-orange-100/50 p-3 w-full max-w-sm border border-orange-100">
             <div
               className="relative rounded-2xl overflow-hidden bg-slate-100"
               style={{ aspectRatio: "4/3" }}
@@ -356,46 +403,58 @@ export function PracticePage({
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 gap-2 p-4 text-center">
                       <span className="text-3xl">📷</span>
                       <p className="text-slate-600 font-semibold text-sm">Camera unavailable</p>
-                      <p className="text-slate-400 text-xs">
-                        Tip: use Demo Mode for a reliable pitch
-                      </p>
+                      <p className="text-slate-400 text-xs">Use Demo Mode for a reliable pitch</p>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-slate-100 to-slate-200 gap-2">
-                  <div className="text-5xl">🤩</div>
+                  <motion.div
+                    className="text-5xl"
+                    animate={{ rotate: [0, -4, 4, -4, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    🤩
+                  </motion.div>
                   <p className="text-xs text-slate-500 font-semibold">Simulated face tracking</p>
                 </div>
               )}
               {phase === "listening" && holdProgress > 0 && (
                 <div className="absolute top-2 right-2">
-                  <ScoreRing score={Math.round(holdProgress)} size={52} strokeWidth={6} label="hold" />
+                  <ScoreRing
+                    score={Math.round(holdProgress)}
+                    size={52}
+                    strokeWidth={6}
+                    label="hold"
+                  />
                 </div>
               )}
             </div>
+
             {phase === "listening" && (
               <div className="flex items-center gap-3 mt-3">
-                <ScoreRing score={displayScore} size={68} strokeWidth={8} label="score" />
+                <ScoreRing score={displayScore} size={64} strokeWidth={7} label="shape" />
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-slate-600 leading-snug">{feedbackMsg}</p>
+                  <p className="text-xs font-semibold text-slate-500 leading-snug">
+                    {feedbackMsg}
+                  </p>
                   {target.visibility === "partial" && (
-                    <p className="text-xs text-amber-600 font-medium mt-1">
+                    <p className="text-[11px] text-amber-600 font-semibold mt-1">
                       👁 Partial visual feedback
+                    </p>
+                  )}
+                  {isDemoMode && (
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Demo — score will auto-complete ✨
                     </p>
                   )}
                 </div>
               </div>
             )}
-            {isDemoMode && isVisual && phase === "listening" && (
-              <p className="text-xs text-slate-400 text-center mt-2">
-                Demo mode — score will auto-complete a rep ✨
-              </p>
-            )}
           </div>
         )}
 
-        {/* Audio attempt panel (audio-only targets) */}
+        {/* Audio panel — audio-only targets */}
         {!isVisual && phase === "listening" && (
           <AudioAttemptPanel
             audioState={audioState}
@@ -405,22 +464,42 @@ export function PracticePage({
           />
         )}
 
-        {/* Feedback on rep complete */}
-        {phase === "rep-complete" && feedbackMsg && (
-          <div className="w-full max-w-sm">
-            <FeedbackBubble message={feedbackMsg} variant="success" />
-          </div>
-        )}
+        {/* Rep-complete feedback */}
+        <AnimatePresence>
+          {phase === "rep-complete" && feedbackMsg && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.86, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: -4 }}
+              transition={{ type: "spring", stiffness: 420, damping: 24 }}
+              className="w-full max-w-sm"
+            >
+              <FeedbackBubble message={feedbackMsg} variant="success" />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Start button */}
-        {phase === "intro" && (
-          <button
-            onClick={startListening}
-            className="w-full max-w-sm bg-orange-500 hover:bg-orange-600 text-white font-black text-xl rounded-full py-5 shadow-lg shadow-orange-200 transition-all duration-150 active:scale-95"
-          >
-            {isVisual ? "Begin — show me! 👄" : "Begin — say it! 🎤"}
-          </button>
-        )}
+        <AnimatePresence>
+          {phase === "intro" && (
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full max-w-sm"
+            >
+              <motion.button
+                onClick={startListening}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black text-xl rounded-full py-5 shadow-xl shadow-orange-200"
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 520, damping: 32 }}
+              >
+                {isVisual ? "Begin — show me! 👄" : "Begin — say it! 🎤"}
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
